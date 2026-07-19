@@ -208,6 +208,7 @@ export default function SearchPage({ personalization, activeSessionId, jobMode }
       {/* Chat thread — full width */}
       <div className="flex-1 flex flex-col min-h-0 border-0 md:border md:border-[var(--color-border)] md:rounded-xl overflow-hidden">
         <ChatPanel
+          key={activeSessionId || 'default'}
           messages={messages}
           onSend={handleSend}
           isLoading={isLoading}

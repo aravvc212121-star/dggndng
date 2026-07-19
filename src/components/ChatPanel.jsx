@@ -13,28 +13,37 @@ function TypingIndicator() {
   );
 }
 
-// Simple markdown-ish renderer for career coaching roadmaps
+// Professional markdown renderer for career coaching roadmaps
 function FormattedText({ text }) {
   if (!text) return null;
   
-  // Check if text has markdown-like formatting (bold, bullets, headers)
-  const hasFormatting = /(\*\*|^[-•]|\n[-•])/m.test(text);
-  if (!hasFormatting) return <span>{text}</span>;
-
   const lines = text.split('\n');
   return (
-    <div className="formatted-roadmap space-y-1">
+    <div className="formatted-roadmap text-[14.5px] leading-[1.65] text-[#2c2c30]">
       {lines.map((line, i) => {
         const trimmed = line.trim();
-        if (!trimmed) return <div key={i} className="h-2" />;
+        if (!trimmed) return <div key={i} className="h-3" />; // Enhanced spacing for empty lines
         
         // Bullet points
         if (/^[-•]\s/.test(trimmed)) {
           const content = trimmed.replace(/^[-•]\s*/, '');
           return (
-            <div key={i} className="flex items-start gap-2 pl-1">
-              <span className="text-[var(--color-accent)] mt-1 shrink-0">•</span>
-              <span dangerouslySetInnerHTML={{ __html: renderInline(content) }} />
+            <div key={i} className="flex items-start gap-2.5 pl-1 mb-2.5">
+              <span className="text-[var(--color-accent)] mt-[1px] shrink-0 opacity-80 text-[18px] leading-none">•</span>
+              <span className="flex-1" dangerouslySetInnerHTML={{ __html: renderInline(content) }} />
+            </div>
+          );
+        }
+
+        // Numbered list items
+        if (/^\d+\.\s/.test(trimmed)) {
+          const numMatch = trimmed.match(/^(\d+\.)\s/);
+          const num = numMatch ? numMatch[1] : '';
+          const content = trimmed.replace(/^\d+\.\s*/, '');
+          return (
+            <div key={i} className="flex items-start gap-2 pl-1 mb-2.5">
+              <span className="text-[var(--color-text-secondary)] font-medium shrink-0">{num}</span>
+              <span className="flex-1" dangerouslySetInnerHTML={{ __html: renderInline(content) }} />
             </div>
           );
         }
@@ -43,15 +52,15 @@ function FormattedText({ text }) {
         if (/^\*\*[^*]+\*\*\s*$/.test(trimmed)) {
           const headerText = trimmed.replace(/\*\*/g, '');
           return (
-            <p key={i} className="font-semibold text-[var(--color-text-primary)] m-0 mt-2 mb-0.5">
+            <h4 key={i} className="font-semibold text-[15px] text-[#111] mt-5 mb-2 tracking-tight">
               {headerText}
-            </p>
+            </h4>
           );
         }
         
         // Regular line with possible inline bold
         return (
-          <p key={i} className="m-0" dangerouslySetInnerHTML={{ __html: renderInline(trimmed) }} />
+          <p key={i} className="mb-3.5 last:mb-0" dangerouslySetInnerHTML={{ __html: renderInline(trimmed) }} />
         );
       })}
     </div>
@@ -59,8 +68,8 @@ function FormattedText({ text }) {
 }
 
 function renderInline(text) {
-  // Convert **bold** to <strong>
-  return text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Convert **bold** to <strong> with better contrast
+  return text.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-[#111]">$1</strong>');
 }
 
 function SuggestionChips({ suggestions, onSelect }) {
@@ -80,7 +89,33 @@ function SuggestionChips({ suggestions, onSelect }) {
   );
 }
 
+function AnimatedText({ text, isNew }) {
+  const [displayedText, setDisplayedText] = useState(isNew ? '' : text);
+
+  useEffect(() => {
+    if (!isNew || !text) {
+      setDisplayedText(text || '');
+      return;
+    }
+    
+    let i = 0;
+    const interval = setInterval(() => {
+      setDisplayedText(text.slice(0, i + 3));
+      i += 3;
+      if (i >= text.length) {
+        setDisplayedText(text);
+        clearInterval(interval);
+      }
+    }, 15);
+    
+    return () => clearInterval(interval);
+  }, [text, isNew]);
+
+  return <FormattedText text={displayedText} />;
+}
+
 export default function ChatPanel({ messages, onSend, isLoading, onApplied }) {
+  const [initialCount] = useState(messages.length);
   const [input, setInput] = useState('');
   const [attachedFile, setAttachedFile] = useState(null);
   const messagesEndRef = useRef(null);
@@ -179,7 +214,7 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied }) {
               <div className="flex justify-start">
                 <div className="max-w-[85%]">
                   <div className="px-1 py-1.5 text-sm leading-relaxed text-[var(--color-text-primary)]">
-                    <FormattedText text={msg.content} />
+                    <AnimatedText text={msg.content} isNew={i >= initialCount} />
                   </div>
                   {msg.suggestions && (
                     <SuggestionChips suggestions={msg.suggestions} onSelect={onSend} />
@@ -194,7 +229,7 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied }) {
                 <div className="w-full">
                   {msg.content && (
                     <div className="px-1 py-1.5 text-sm leading-relaxed text-[var(--color-text-primary)] mb-2 inline-block">
-                      {msg.content}
+                      <AnimatedText text={msg.content} isNew={i >= initialCount} />
                     </div>
                   )}
                   {/* Company follow card if company search */}
@@ -237,7 +272,7 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied }) {
                   {/* Follow-up message after jobs */}
                   {msg.followUp && (
                     <div className="mt-2 px-1 py-1.5 text-sm leading-relaxed text-[var(--color-text-primary)] inline-block">
-                      {msg.followUp}
+                      <AnimatedText text={msg.followUp} isNew={i >= initialCount} />
                     </div>
                   )}
                   {msg.suggestions && (
