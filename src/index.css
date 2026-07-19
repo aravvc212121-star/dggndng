@@ -1,0 +1,261 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-accent: #1a1a2e;
+  --color-accent-light: #2d2d44;
+  --color-surface: #faf8f5;
+  --color-surface-alt: #f8f8fa;
+  --color-border: #e2e2e6;
+  --color-border-dark: #c8c8ce;
+  --color-text-primary: #111111;
+  --color-text-secondary: #6b6b76;
+  --color-text-tertiary: #9b9ba5;
+  --color-success: #2d6a4f;
+  --color-warning: #b5851b;
+  --color-danger: #9b2c2c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 15px;
+  line-height: 1.55;
+  /* PWA Optimizations */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none; /* Prevent pull-to-refresh */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  overflow-x: hidden;
+}
+
+/* Prevent zoom on input focus for iOS */
+input, textarea, select {
+  font-size: 16px !important; 
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-dark);
+  border-radius: 3px;
+}
+
+/* Hide scrollbar utility for specific containers (like full-screen carousels) */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Chat input focus ring */
+.chat-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+/* Transition utility */
+.transition-default {
+  transition: all 0.15s ease;
+}
+
+/* Status pill variants */
+.status-applied {
+  border-color: var(--color-border-dark);
+  color: var(--color-text-secondary);
+}
+.status-interview {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.status-offer {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+.status-rejected {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+/* Relevance bar */
+.relevance-bar {
+  width: 4px;
+  border-radius: 2px;
+  min-height: 40px;
+}
+
+/* Drag-and-drop zone */
+.drop-zone {
+  border: 1.5px dashed var(--color-border-dark);
+  border-radius: 12px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.drop-zone.drag-over {
+  border-color: var(--color-accent);
+  background: var(--color-surface-alt);
+}
+
+/* Pulse animation for loading */
+@keyframes pulse-dot {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+.typing-dot {
+  animation: pulse-dot 1.4s infinite ease-in-out;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Fade-in animation */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+
+/* Job mode toggle switch */
+.toggle-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--color-border-dark);
+  cursor: pointer;
+  transition: background 0.2s ease;
+  border: none;
+  padding: 0;
+  flex-shrink: 0;
+}
+.toggle-track.active {
+  background: var(--color-accent);
+}
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s ease;
+  pointer-events: none;
+}
+.toggle-track.active .toggle-knob {
+  transform: translateX(100%);
+}
+
+/* Job detail focused view — backdrop */
+.job-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: backdrop-fade-in 0.25s ease-out forwards;
+}
+.job-detail-backdrop.closing {
+  animation: backdrop-fade-out 0.25s ease-in forwards;
+}
+
+/* Job detail focused view — card */
+.job-detail-card {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: card-scale-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  will-change: transform, opacity;
+}
+.job-detail-card.closing {
+  animation: card-scale-out 0.2s ease-in forwards;
+}
+
+@keyframes backdrop-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes backdrop-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes card-scale-in {
+  from { opacity: 0; transform: scale(0.88); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes card-scale-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.92); }
+}
+
+.verification-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.verification-badge.verified {
+  color: var(--color-success);
+  background: rgba(45, 106, 79, 0.08);
+}
+.verification-badge.unverified {
+  color: var(--color-text-tertiary);
+  background: rgba(155, 155, 165, 0.08);
+}
+
+/* Mobile Keyboard Optimizations */
+@media (max-width: 768px) {
+  body.keyboard-open #bottom-tab-bar {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(100%);
+  }
+  body.keyboard-open #chat-input-wrapper {
+    bottom: 1rem !important;
+  }
+}
+
+/* Hide default webkit search clear button */
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-results-button,
+input[type="search"]::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+}
