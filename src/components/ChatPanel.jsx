@@ -114,17 +114,31 @@ function AnimatedText({ text, isNew }) {
   return <FormattedText text={displayedText} />;
 }
 
-export default function ChatPanel({ messages, onSend, isLoading, onApplied }) {
+export default function ChatPanel({ messages, onSend, isLoading, onApplied, sessionId }) {
   const [initialCount] = useState(messages.length);
+  const [prevMessagesCount, setPrevMessagesCount] = useState(messages.length);
   const [input, setInput] = useState('');
   const [attachedFile, setAttachedFile] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
+  const scrollContainerRef = useRef(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+    if (messages.length > prevMessagesCount || isLoading) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      setPrevMessagesCount(messages.length);
+    }
+  }, [messages, isLoading, prevMessagesCount]);
+
+  useEffect(() => {
+    const savedScroll = sessionStorage.getItem(`chat-scroll-${sessionId}`);
+    if (savedScroll && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = parseInt(savedScroll, 10);
+    } else if (scrollContainerRef.current && messages.length === 0) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [sessionId, messages.length]);
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -172,8 +186,15 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied }) {
     <div className="flex flex-col h-full" id="chat-panel">
       {/* Messages */}
       <div
+        ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-4 pt-16 md:pt-4 pb-[80px] md:pb-4 space-y-4 min-h-0"
-        onScroll={e => window.dispatchEvent(new CustomEvent('chatScroll', { detail: { scrollTop: e.currentTarget.scrollTop } }))}
+        onScroll={e => {
+          const scrollTop = e.currentTarget.scrollTop;
+          if (sessionId) {
+            sessionStorage.setItem(`chat-scroll-${sessionId}`, scrollTop.toString());
+          }
+          window.dispatchEvent(new CustomEvent('chatScroll', { detail: { scrollTop } }));
+        }}
       >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center py-12">

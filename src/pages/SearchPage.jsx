@@ -12,6 +12,7 @@ export default function SearchPage({ personalization, activeSessionId, jobMode }
   const { isAuthenticated } = useAuth();
   const [profile, setProfile] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [isMessagesLoaded, setIsMessagesLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const searchCount = useRef(0);
@@ -29,11 +30,16 @@ export default function SearchPage({ personalization, activeSessionId, jobMode }
   // Load session messages when activeSessionId changes
   useEffect(() => {
     let isMounted = true;
+    setIsMessagesLoaded(false);
+    
     async function load() {
       // First check local storage for this specific session
       const localSession = getSession(activeSessionId);
       if (localSession && localSession.messages && localSession.messages.length > 0) {
-        if (isMounted) setMessages(localSession.messages);
+        if (isMounted) {
+          setMessages(localSession.messages);
+          setIsMessagesLoaded(true);
+        }
         return;
       }
       
@@ -66,6 +72,7 @@ export default function SearchPage({ personalization, activeSessionId, jobMode }
               };
             });
             setMessages(parsedHistory);
+            setIsMessagesLoaded(true);
             return;
           }
         } catch (err) {
@@ -74,7 +81,10 @@ export default function SearchPage({ personalization, activeSessionId, jobMode }
       }
       
       // New session or no history found — start fresh
-      if (isMounted) setMessages([]);
+      if (isMounted) {
+        setMessages([]);
+        setIsMessagesLoaded(true);
+      }
     }
     load();
     return () => { isMounted = false; };
@@ -207,13 +217,20 @@ export default function SearchPage({ personalization, activeSessionId, jobMode }
     <div className="w-full h-full flex flex-col px-0 md:px-6 py-0 md:py-4" id="search-page">
       {/* Chat thread — full width */}
       <div className="flex-1 flex flex-col min-h-0 border-0 md:border md:border-[var(--color-border)] md:rounded-xl overflow-hidden">
-        <ChatPanel
-          key={activeSessionId || 'default'}
-          messages={messages}
-          onSend={handleSend}
-          isLoading={isLoading}
-          onApplied={() => {}}
-        />
+        {isMessagesLoaded ? (
+          <ChatPanel
+            key={activeSessionId || 'default'}
+            sessionId={activeSessionId || 'default'}
+            messages={messages}
+            onSend={handleSend}
+            isLoading={isLoading}
+            onApplied={() => {}}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="typing-dot w-1.5 h-1.5 rounded-full bg-[var(--color-text-tertiary)] animate-bounce" />
+          </div>
+        )}
       </div>
 
       {/* Notification permission prompt */}

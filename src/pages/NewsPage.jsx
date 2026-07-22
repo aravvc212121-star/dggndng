@@ -235,7 +235,7 @@ export default function NewsPage() {
   }
 
   return (
-    <div className="h-full w-full flex flex-col relative overflow-hidden bg-[var(--color-surface-alt)]" id="news-page">
+    <div className="h-full w-full flex flex-col relative overflow-hidden bg-[var(--color-surface)]" id="news-page">
       
       {/* Header Area (Static) */}
       <div className="shrink-0 z-50 bg-[var(--color-surface)] border-b border-[var(--color-border)] pb-3">
@@ -286,7 +286,7 @@ export default function NewsPage() {
         {articles.map((article, index) => (
           <article
             key={article.id}
-            className="story-slide w-full max-w-full shrink-0 basis-full flex-none h-full snap-start flex items-center justify-center bg-[var(--color-surface-alt)] box-border"
+            className="story-slide w-full max-w-full shrink-0 basis-full flex-none h-full snap-start flex items-center justify-center bg-transparent box-border"
           >
             {/* Scaled/Faded content wrapper */}
             <div 
