@@ -18,18 +18,62 @@ function FormattedText({ text, onQuestionSelect }) {
   if (!text) return null;
   
   const lines = text.split('\n');
+
+  const getType = (trimmed) => {
+    if (/^[-•*]\s/.test(trimmed)) return 'bullet_list';
+    if (/^\d+\.\s/.test(trimmed)) return 'numbered_list';
+    if (/^(?:\*\*|\*)(.+?)(?:\*\*|\*)\s*$/.test(trimmed)) return 'heading';
+    return 'paragraph';
+  };
+
   return (
     <div className="formatted-roadmap text-[14.5px] leading-[1.65] text-[#2c2c30]">
       {lines.map((line, i) => {
         const trimmed = line.trim();
         if (!trimmed) return <div key={i} className="h-3" />; // Enhanced spacing for empty lines
         
+        const currentType = getType(trimmed);
+        
+        // Find previous non-empty line
+        let prevType = null;
+        let prevText = '';
+        for (let j = i - 1; j >= 0; j--) {
+          const pt = lines[j].trim();
+          if (pt) {
+            prevText = pt;
+            prevType = getType(pt);
+            break;
+          }
+        }
+
+        let needsDivider = false;
+        if (prevType) {
+          const isList = (t) => t === 'bullet_list' || t === 'numbered_list';
+          
+          if (currentType === 'heading') {
+            needsDivider = true;
+          } else if (isList(currentType) && prevType === 'paragraph') {
+            // Don't insert divider if the paragraph introduces the list (ends with : or ,)
+            if (!prevText.match(/[:;,]\s*$/)) {
+              needsDivider = true;
+            }
+          } else if (currentType === 'paragraph' && isList(prevType)) {
+            needsDivider = true;
+          }
+        }
+
+        const divider = needsDivider ? (
+          <div key={`div-${i}`} className="my-6 mx-auto h-[1px] w-[calc(100%-48px)] rounded-full bg-black/[0.08] dark:bg-white/[0.08] animate-fade-in" />
+        ) : null;
+        
+        let contentElement = null;
+
         // Bullet points
-        if (/^[-•*]\s/.test(trimmed)) {
+        if (currentType === 'bullet_list') {
           const content = trimmed.replace(/^[-•*]\s*/, '');
           const isQuestion = content.includes('?');
-          return (
-            <div key={i} className="flex items-start gap-2.5 pl-1 mb-2.5 group">
+          contentElement = (
+            <div key={`content-${i}`} className="flex items-start gap-2.5 pl-1 mb-2.5 group">
               <span className="text-[var(--color-accent)] mt-[1px] shrink-0 opacity-80 text-[18px] leading-none">•</span>
               <span dangerouslySetInnerHTML={{ __html: renderInline(content) }} />
               {isQuestion && onQuestionSelect && (
@@ -46,13 +90,13 @@ function FormattedText({ text, onQuestionSelect }) {
         }
 
         // Numbered list items
-        if (/^\d+\.\s/.test(trimmed)) {
+        else if (currentType === 'numbered_list') {
           const numMatch = trimmed.match(/^(\d+\.)\s/);
           const num = numMatch ? numMatch[1] : '';
           const content = trimmed.replace(/^\d+\.\s*/, '');
           const isQuestion = content.includes('?');
-          return (
-            <div key={i} className="flex items-start gap-2 pl-1 mb-2.5 group">
+          contentElement = (
+            <div key={`content-${i}`} className="flex items-start gap-2 pl-1 mb-2.5 group">
               <span className="text-[var(--color-text-secondary)] font-medium shrink-0">{num}</span>
               <span dangerouslySetInnerHTML={{ __html: renderInline(content) }} />
               {isQuestion && onQuestionSelect && (
@@ -69,19 +113,23 @@ function FormattedText({ text, onQuestionSelect }) {
         }
         
         // Bold-only line (likely a header)
-        if (/^(?:\*\*|\*)(.+?)(?:\*\*|\*)\s*$/.test(trimmed)) {
+        else if (currentType === 'heading') {
           const headerText = trimmed.replace(/(^\*\*?|\*\*?$)/g, '');
-          return (
-            <h4 key={i} className="font-semibold text-[15px] text-[#111] mt-5 mb-2 tracking-tight">
+          contentElement = (
+            <h4 key={`content-${i}`} className="font-semibold text-[15px] text-[#111] mt-5 mb-2 tracking-tight">
               {headerText}
             </h4>
           );
         }
         
         // Regular line with possible inline bold
-        return (
-          <p key={i} className="mb-3.5 last:mb-0" dangerouslySetInnerHTML={{ __html: renderInline(trimmed) }} />
-        );
+        else {
+          contentElement = (
+            <p key={`content-${i}`} className="mb-3.5 last:mb-0" dangerouslySetInnerHTML={{ __html: renderInline(trimmed) }} />
+          );
+        }
+
+        return divider ? [divider, contentElement] : contentElement;
       })}
     </div>
   );
@@ -111,7 +159,7 @@ function SuggestionChips({ suggestions, onSelect }) {
   );
 }
 
-function AnimatedText({ text, isNew, suggestions, onSelectSuggestion }) {
+function AnimatedText({ text, isNew, suggestions, onSelectSuggestion, onUpdate }) {
   const [displayedText, setDisplayedText] = useState(isNew ? '' : text);
   const [isComplete, setIsComplete] = useState(!isNew);
 
@@ -127,6 +175,7 @@ function AnimatedText({ text, isNew, suggestions, onSelectSuggestion }) {
     const interval = setInterval(() => {
       setDisplayedText(text.slice(0, i + 3));
       i += 3;
+      if (onUpdate) onUpdate();
       if (i >= text.length) {
         setDisplayedText(text);
         setIsComplete(true);
@@ -135,7 +184,7 @@ function AnimatedText({ text, isNew, suggestions, onSelectSuggestion }) {
     }, 15);
     
     return () => clearInterval(interval);
-  }, [text, isNew]);
+  }, [text, isNew, onUpdate]);
 
   return (
     <>
@@ -259,7 +308,7 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied, sess
             {/* User messages */}
             {msg.role === 'user' && (
               <div className="flex justify-end">
-                <div className="max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed bg-[var(--color-accent)] text-white rounded-br-md">
+                <div className="max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed bg-[#E5E5E5] text-[#111] rounded-br-md">
                   {msg.content}
                 </div>
               </div>
@@ -274,6 +323,7 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied, sess
                     isNew={i >= initialCount} 
                     suggestions={msg.suggestions} 
                     onSelectSuggestion={onSend} 
+                    onUpdate={() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })}
                   />
                 </div>
               </div>
@@ -285,7 +335,11 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied, sess
                 <div className="w-full">
                   {msg.content && (
                     <div className="px-1 py-1.5 text-sm leading-relaxed text-[var(--color-text-primary)] mb-2 inline-block">
-                      <AnimatedText text={msg.content} isNew={i >= initialCount} />
+                      <AnimatedText 
+                        text={msg.content} 
+                        isNew={i >= initialCount} 
+                        onUpdate={() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })}
+                      />
                     </div>
                   )}
                   {/* Company follow card if company search */}
