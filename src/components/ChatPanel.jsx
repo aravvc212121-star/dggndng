@@ -159,7 +159,7 @@ function SuggestionChips({ suggestions, onSelect }) {
   );
 }
 
-function AnimatedText({ text, isNew, suggestions, onSelectSuggestion, onUpdate }) {
+function AnimatedText({ text, isNew, suggestions, onSelectSuggestion }) {
   const [displayedText, setDisplayedText] = useState(isNew ? '' : text);
   const [isComplete, setIsComplete] = useState(!isNew);
 
@@ -175,7 +175,6 @@ function AnimatedText({ text, isNew, suggestions, onSelectSuggestion, onUpdate }
     const interval = setInterval(() => {
       setDisplayedText(text.slice(0, i + 3));
       i += 3;
-      if (onUpdate) onUpdate();
       if (i >= text.length) {
         setDisplayedText(text);
         setIsComplete(true);
@@ -184,7 +183,7 @@ function AnimatedText({ text, isNew, suggestions, onSelectSuggestion, onUpdate }
     }, 15);
     
     return () => clearInterval(interval);
-  }, [text, isNew, onUpdate]);
+  }, [text, isNew]);
 
   return (
     <>
@@ -323,7 +322,6 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied, sess
                     isNew={i >= initialCount} 
                     suggestions={msg.suggestions} 
                     onSelectSuggestion={onSend} 
-                    onUpdate={() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })}
                   />
                 </div>
               </div>
@@ -335,11 +333,7 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied, sess
                 <div className="w-full">
                   {msg.content && (
                     <div className="px-1 py-1.5 text-sm leading-relaxed text-[var(--color-text-primary)] mb-2 inline-block">
-                      <AnimatedText 
-                        text={msg.content} 
-                        isNew={i >= initialCount} 
-                        onUpdate={() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })}
-                      />
+                      <AnimatedText text={msg.content} isNew={i >= initialCount} />
                     </div>
                   )}
                   {/* Company follow card if company search */}
