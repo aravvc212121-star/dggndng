@@ -142,10 +142,72 @@ const BOARDS = [
   { type: 'lever', token: 'netflix', name: 'Netflix' },
 ];
 
-async function searchWithSerper(company, role, location) {
+const GOVT_GLOSSARY = [
+  'Indian Army', 'Indian Navy', 'Indian Air Force', 'IAF', 'NDA', 'CDS', 'Agniveer', 'Agnipath',
+  'BSF', 'CRPF', 'CISF', 'ITBP', 'SSB', 'Assam Rifles', 'Coast Guard', 'Territorial Army', 'DRDO',
+  'defence civilian jobs', 'IB (Intelligence Bureau)', 'RAW (Research and Analysis Wing)', 'CBI',
+  'NIA', 'ED (Enforcement Directorate)', 'NCB (Narcotics Control Bureau)', 'UPSC', 'IAS', 'IPS',
+  'IFS', 'IRS', 'civil services exam', 'state civil services', 'PCS', 'state PSC', 'MPSC', 'UPPSC',
+  'BPSC', 'TNPSC', 'KPSC', 'WBPSC', 'Group A/B/C/D government posts', 'IBPS', 'SBI PO', 'SBI Clerk',
+  'RBI Grade B', 'NABARD', 'public sector bank recruitment', 'LIC AAO', 'insurance sector government exams',
+  'SSC', 'SSC CGL', 'SSC CHSL', 'SSC MTS', 'SSC GD', 'SSC Stenographer', 'RRB', 'Railway Recruitment Board',
+  'RRB NTPC', 'RRB Group D', 'Indian Railways recruitment', 'state police recruitment', 'sub-inspector',
+  'constable recruitment', 'Delhi Police', 'forest guard', 'excise department', 'judicial services exam',
+  'court clerk recruitment', 'public prosecutor', 'government legal officer', 'TET', 'CTET',
+  'government school teacher recruitment', 'KVS', 'Kendriya Vidyalaya Sangathan', 'NVS',
+  'Navodaya Vidyalaya Samiti', 'university/college government faculty recruitment', 'UGC NET',
+  'India Post', 'postal assistant', 'GDS', 'Gramin Dak Sevak', 'BSNL', 'ONGC', 'NTPC', 'GAIL',
+  'Coal India', 'PSU recruitment', 'DDA', 'Delhi Development Authority', 'MCD', 'Municipal Corporation',
+  'state electricity board', 'municipal corporation recruitment', 'panchayat-level government jobs',
+  'state government departments', 'AIIMS recruitment', 'government hospital jobs', 'ESIC', 'CGHS',
+  'government medical officer posts', 'sarkari naukri', 'sarkari job', 'government vacancy',
+  'public sector job', 'PSU job', 'govt exam', '.gov.in', '.nic.in'
+];
+
+const GOVT_DOMAINS = {
+  "upsc": "upsc.gov.in",
+  "ssc": "ssc.nic.in",
+  "ibps": "ibps.in",
+  "indian army": "joinindianarmy.nic.in",
+  "indian navy": "joinindiannavy.gov.in",
+  "indian air force": "afcat.cdac.in",
+  "railway": "rrbcdg.gov.in",
+  "ib": "mha.gov.in",
+  "dda": "dda.gov.in",
+  "drdo": "drdo.gov.in",
+  "sbi": "sbi.co.in/web/careers"
+};
+
+function getGovernmentSearchDomain(query) {
+  if (!query) return null;
+  const lowerQuery = query.toLowerCase();
+
+  // Check specific organizations first
+  for (const [org, domain] of Object.entries(GOVT_DOMAINS)) {
+    if (lowerQuery.includes(org)) {
+      return domain;
+    }
+  }
+
+  // Fallback to general NCS portal if any glossary term matches
+  for (const term of GOVT_GLOSSARY) {
+    if (lowerQuery.includes(term.toLowerCase())) {
+      return "ncs.gov.in";
+    }
+  }
+
+  return null;
+}
+
+async function searchWithSerper(company, role, location, govDomain = null) {
   if (!process.env.SERPER_API_KEY) return [];
   const parts = [role, company, location].filter(Boolean);
-  parts.push('jobs (site:linkedin.com/jobs OR site:naukri.com OR site:indeed.com)');
+  
+  if (govDomain) {
+    parts.push(`jobs site:${govDomain}`);
+  } else {
+    parts.push('jobs (site:linkedin.com/jobs OR site:naukri.com OR site:indeed.com)');
+  }
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 6000);
@@ -175,10 +237,12 @@ async function searchWithSerper(company, role, location) {
   } catch { return []; }
 }
 
-async function searchWithTavily(company, role, location) {
+async function searchWithTavily(company, role, location, govDomain = null) {
   if (!process.env.TAVILY_API_KEY) return [];
   const parts = [role, company, location].filter(Boolean);
   parts.push('jobs');
+  
+  const include_domains = govDomain ? [govDomain] : ['linkedin.com', 'naukri.com', 'indeed.com'];
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 6000);
@@ -189,7 +253,7 @@ async function searchWithTavily(company, role, location) {
         api_key: process.env.TAVILY_API_KEY,
         query: parts.join(' '),
         search_depth: 'basic',
-        include_domains: ['linkedin.com', 'naukri.com', 'indeed.com'],
+        include_domains: include_domains,
       }),
       signal: controller.signal,
     });
@@ -296,11 +360,24 @@ function scoreJobs(jobs, skills = [], targetRole = '') {
 
 async function searchAllJobs(filters) {
   const { company, role, location } = filters;
-  const [serper, tavily, ats] = await Promise.all([
-    searchWithSerper(company, role, location),
-    searchWithTavily(company, role, location),
-    searchATSBoards(company, role),
-  ]);
+  const queryStr = `${company || ''} ${role || ''} ${location || ''}`.trim();
+  const govDomain = getGovernmentSearchDomain(queryStr);
+
+  const searchPromises = [
+    searchWithSerper(company, role, location, govDomain),
+    searchWithTavily(company, role, location, govDomain),
+  ];
+
+  // Government jobs don't use modern startup ATS platforms like Greenhouse/Lever
+  if (!govDomain) {
+    searchPromises.push(searchATSBoards(company, role));
+  }
+
+  const results = await Promise.all(searchPromises);
+  const tavily = results[1] || [];
+  const serper = results[0] || [];
+  const ats = results[2] || [];
+
   // Tavily first (usually most relevant), then Serper, then ATS
   const all = [...tavily, ...serper, ...ats];
   // Deduplicate by link
@@ -428,6 +505,11 @@ PRACTICAL ADVICE DIFFERENTIATORS (what makes Jobsy's advice actually useful, not
 25. Use current search when it matters. For anything where being current genuinely changes the answer — in-demand skills, salary ranges, exam pattern changes — use the search tool rather than relying solely on general knowledge.
 26. Skip generic internet folklore. Don't repeat commonly-cited but weakly evidence-based advice as universal rules — make sure it's actually current best practice for their specific situation.
 27. End with a natural next action when appropriate. Offer the obvious follow-through if it fits — but only one offer at a time, only when genuinely a next step, not as a forced habit on every message.
+
+FOLLOW-UP RESOLUTION:
+When a user's message references something ambiguously ("it", "this", "that role", "this one", "more about this") without naming it explicitly, resolve the reference against what was actually discussed earlier in this conversation — the most recently discussed role, skill, company, or topic is almost always what "it"/"this" refers to. Do not ask "what do you mean by 'it'?" if the conversation history makes the referent clear; only ask for clarification if the conversation genuinely has multiple equally-recent candidates the reference could point to.
+
+This applies whether the earlier mention was a full topic (e.g. "Cyber Security Analyst") or something briefly named. A follow-up like "tell me more about this role as a fresher" after discussing a role should be treated as: continue explaining [that same role], specifically scoped to a fresher/entry-level perspective — not as a new unrelated query and not as a trigger for a fresh job search.
 
 Current mode: {{job_mode}}
 - If mode is "job": you may proactively recommend and return job cards for genuine job-search or recommendation intent, in addition to conversation.
@@ -768,8 +850,7 @@ INTENT CLASSIFICATION:
 MESSAGE RULES:
 - For greetings/smalltalk: be brief, warm, ask what job they're looking for
 - For job_search: add context around the jobs! Explain what you found and why, any gaps between their profile and what's required, and concrete next steps. Do NOT list the actual job titles/links/companies in text, they will be shown as cards automatically.
-- For career_coaching: be detailed with roadmaps, use **bold** and bullet points
-- For help: give useful advice, ask about interests
+- For career_coaching and help: be detailed and useful. IMPORTANT: After your advice, you MUST ask the user exactly 4 related questions that they might want to ask next based on the topic. After these 4 questions, ALWAYS conclude with exactly this sentence: "i would love to answer this if you want to know more."
 - NEVER list job titles, companies, or job URLs in your message text. Jobs are rendered separately as visual cards.
 - Keep responses concise (2-4 sentences for simple queries, detailed for coaching or job context)
 

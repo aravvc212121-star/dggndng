@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { SendHorizontal, Plus, X, FileText } from 'lucide-react';
+import { SendHorizontal, Plus, X, FileText, ArrowUp, CornerDownRight } from 'lucide-react';
 import JobCard from './JobCard';
 import FollowButton from './FollowButton';
 
@@ -14,7 +14,7 @@ function TypingIndicator() {
 }
 
 // Professional markdown renderer for career coaching roadmaps
-function FormattedText({ text }) {
+function FormattedText({ text, onQuestionSelect }) {
   if (!text) return null;
   
   const lines = text.split('\n');
@@ -25,12 +25,22 @@ function FormattedText({ text }) {
         if (!trimmed) return <div key={i} className="h-3" />; // Enhanced spacing for empty lines
         
         // Bullet points
-        if (/^[-•]\s/.test(trimmed)) {
-          const content = trimmed.replace(/^[-•]\s*/, '');
+        if (/^[-•*]\s/.test(trimmed)) {
+          const content = trimmed.replace(/^[-•*]\s*/, '');
+          const isQuestion = content.includes('?');
           return (
-            <div key={i} className="flex items-start gap-2.5 pl-1 mb-2.5">
+            <div key={i} className="flex items-start gap-2.5 pl-1 mb-2.5 group">
               <span className="text-[var(--color-accent)] mt-[1px] shrink-0 opacity-80 text-[18px] leading-none">•</span>
-              <span className="flex-1" dangerouslySetInnerHTML={{ __html: renderInline(content) }} />
+              <span dangerouslySetInnerHTML={{ __html: renderInline(content) }} />
+              {isQuestion && onQuestionSelect && (
+                <button
+                  onClick={() => onQuestionSelect(content.replace(/\*+/g, '').trim())}
+                  className="ml-0.5 p-1 text-[var(--color-accent)] opacity-70 hover:opacity-100 hover:bg-[var(--color-surface)] rounded-full shrink-0 transition-all mt-[-2px]"
+                  title="Ask this"
+                >
+                  <CornerDownRight size={14} />
+                </button>
+              )}
             </div>
           );
         }
@@ -40,17 +50,27 @@ function FormattedText({ text }) {
           const numMatch = trimmed.match(/^(\d+\.)\s/);
           const num = numMatch ? numMatch[1] : '';
           const content = trimmed.replace(/^\d+\.\s*/, '');
+          const isQuestion = content.includes('?');
           return (
-            <div key={i} className="flex items-start gap-2 pl-1 mb-2.5">
+            <div key={i} className="flex items-start gap-2 pl-1 mb-2.5 group">
               <span className="text-[var(--color-text-secondary)] font-medium shrink-0">{num}</span>
-              <span className="flex-1" dangerouslySetInnerHTML={{ __html: renderInline(content) }} />
+              <span dangerouslySetInnerHTML={{ __html: renderInline(content) }} />
+              {isQuestion && onQuestionSelect && (
+                <button
+                  onClick={() => onQuestionSelect(content.replace(/\*+/g, '').trim())}
+                  className="ml-0.5 p-1 text-[var(--color-accent)] opacity-70 hover:opacity-100 hover:bg-[var(--color-surface)] rounded-full shrink-0 transition-all mt-[-2px]"
+                  title="Ask this"
+                >
+                  <CornerDownRight size={14} />
+                </button>
+              )}
             </div>
           );
         }
         
         // Bold-only line (likely a header)
-        if (/^\*\*[^*]+\*\*\s*$/.test(trimmed)) {
-          const headerText = trimmed.replace(/\*\*/g, '');
+        if (/^(?:\*\*|\*)(.+?)(?:\*\*|\*)\s*$/.test(trimmed)) {
+          const headerText = trimmed.replace(/(^\*\*?|\*\*?$)/g, '');
           return (
             <h4 key={i} className="font-semibold text-[15px] text-[#111] mt-5 mb-2 tracking-tight">
               {headerText}
@@ -68,8 +88,10 @@ function FormattedText({ text }) {
 }
 
 function renderInline(text) {
-  // Convert **bold** to <strong> with better contrast
-  return text.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-[#111]">$1</strong>');
+  // Convert **bold** and *bold* to <strong> with better contrast
+  let html = text.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-[#111]">$1</strong>');
+  html = html.replace(/(?<!<[^>]*)\*([^*<>]+)\*/g, '<strong class="font-semibold text-[#111]">$1</strong>');
+  return html;
 }
 
 function SuggestionChips({ suggestions, onSelect }) {
@@ -89,21 +111,25 @@ function SuggestionChips({ suggestions, onSelect }) {
   );
 }
 
-function AnimatedText({ text, isNew }) {
+function AnimatedText({ text, isNew, suggestions, onSelectSuggestion }) {
   const [displayedText, setDisplayedText] = useState(isNew ? '' : text);
+  const [isComplete, setIsComplete] = useState(!isNew);
 
   useEffect(() => {
     if (!isNew || !text) {
       setDisplayedText(text || '');
+      setIsComplete(true);
       return;
     }
     
+    setIsComplete(false);
     let i = 0;
     const interval = setInterval(() => {
       setDisplayedText(text.slice(0, i + 3));
       i += 3;
       if (i >= text.length) {
         setDisplayedText(text);
+        setIsComplete(true);
         clearInterval(interval);
       }
     }, 15);
@@ -111,7 +137,16 @@ function AnimatedText({ text, isNew }) {
     return () => clearInterval(interval);
   }, [text, isNew]);
 
-  return <FormattedText text={displayedText} />;
+  return (
+    <>
+      <div className="px-1 py-1.5 text-sm leading-relaxed text-[var(--color-text-primary)]">
+        <FormattedText text={displayedText} onQuestionSelect={onSelectSuggestion} />
+      </div>
+      {isComplete && suggestions && (
+        <SuggestionChips suggestions={suggestions} onSelect={onSelectSuggestion} />
+      )}
+    </>
+  );
 }
 
 export default function ChatPanel({ messages, onSend, isLoading, onApplied, sessionId }) {
@@ -234,12 +269,12 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied, sess
             {msg.role === 'assistant' && !msg.jobs && (
               <div className="flex justify-start">
                 <div className="max-w-[85%]">
-                  <div className="px-1 py-1.5 text-sm leading-relaxed text-[var(--color-text-primary)]">
-                    <AnimatedText text={msg.content} isNew={i >= initialCount} />
-                  </div>
-                  {msg.suggestions && (
-                    <SuggestionChips suggestions={msg.suggestions} onSelect={onSend} />
-                  )}
+                  <AnimatedText 
+                    text={msg.content} 
+                    isNew={i >= initialCount} 
+                    suggestions={msg.suggestions} 
+                    onSelectSuggestion={onSend} 
+                  />
                 </div>
               </div>
             )}
@@ -350,8 +385,7 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied, sess
             </div>
           )}
           
-          <div className="flex items-center gap-2">
-            {/* Attach button - separate circle */}
+          <div className="flex-1 flex flex-row md:flex-col items-center md:items-stretch gap-2 border border-[var(--color-border)] rounded-full md:rounded-[18px] pl-2 pr-2 py-1.5 md:p-3 focus-within:border-[var(--color-accent)] transition-all duration-300 bg-[var(--color-surface)] shadow-none relative">
             <input
               ref={fileInputRef}
               type="file"
@@ -360,18 +394,49 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied, sess
               className="hidden"
               aria-label="Upload resume"
             />
-            <button
-              type="button"
-              onClick={handleAttachClick}
-              className="p-1.5 rounded-full border-0 cursor-pointer text-white hover:bg-gray-800 transition-default shrink-0 flex items-center justify-center bg-black shadow-sm"
-              title="Attach resume"
-              disabled={isLoading}
-            >
-              <Plus size={22} strokeWidth={1.5} />
-            </button>
             
-            {/* Search input bar */}
-            <div className="flex-1 flex items-center gap-2 border border-[var(--color-border)] rounded-full px-4 py-1.5 focus-within:border-[var(--color-accent)] focus-within:shadow-md transition-all duration-300 bg-[var(--color-surface)]/90 backdrop-blur-xl shadow-sm">
+            {/* PC Top row: Textarea */}
+            <textarea
+              name="chat-input-pc"
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                // Auto-resize textarea
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (input.trim() && !isLoading) {
+                    onSend(input.trim());
+                    setInput('');
+                    e.target.style.height = 'auto';
+                  }
+                }
+              }}
+              placeholder="describe the job you're looking for..."
+              className="hidden md:block w-full bg-transparent border-0 outline-none text-[14px] font-light text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] resize-none px-1 pt-1 overflow-y-auto"
+              rows={1}
+              style={{ minHeight: '24px' }}
+              disabled={isLoading}
+            />
+
+            {/* Mobile View & PC Bottom Row */}
+            <div className="flex items-center w-full justify-between gap-2 md:pt-1">
+              
+              {/* Left side: Attach button */}
+              <button
+                type="button"
+                onClick={handleAttachClick}
+                className="p-1.5 rounded-full border-0 cursor-pointer text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-alt)] transition-default shrink-0 flex items-center justify-center bg-transparent"
+                title="Attach resume"
+                disabled={isLoading}
+              >
+                <Plus size={20} strokeWidth={1.5} />
+              </button>
+              
+              {/* Center: Search input (Mobile only) */}
               <input
                 ref={inputRef}
                 type="search"
@@ -385,15 +450,19 @@ export default function ChatPanel({ messages, onSend, isLoading, onApplied, sess
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="describe the job you're looking for..."
-                className="flex-1 bg-transparent border-0 outline-none text-[13px] font-light text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)]"
+                className="md:hidden flex-1 bg-transparent border-0 outline-none text-[14px] font-light text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)]"
                 disabled={isLoading}
               />
+              
+              {/* Right side: Send button */}
               <button
                 type="submit"
                 disabled={!input.trim() || isLoading}
-                className="p-1.5 rounded-full border-0 cursor-pointer transition-default shrink-0 bg-black text-white"
+                className={`p-1.5 rounded-full border-0 transition-all duration-300 shrink-0 flex items-center justify-center bg-black text-white hover:bg-[#111] ${
+                  !input.trim() || isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
+                }`}
               >
-                <SendHorizontal size={20} strokeWidth={1.5} />
+                <ArrowUp size={18} strokeWidth={2.5} />
               </button>
             </div>
           </div>
