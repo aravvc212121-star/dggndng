@@ -44,7 +44,7 @@ async function askGroq(messages, temperature = 0.3, timeoutMs = 5000) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const completion = await groq.chat.completions.create(
-      { messages, model: MODEL, temperature },
+      { messages, model: MODEL, temperature, max_tokens: 800, response_format: { type: "json_object" } },
       { signal: controller.signal }
     );
     clearTimeout(timer);
@@ -395,6 +395,16 @@ YOUR SCOPE EXCLUDES (politely decline and redirect):
 If a user asks something clearly outside scope, decline briefly and redirect, e.g.: "That's outside what I can help with — I'm here for job search, career prep, and exam/skill guidance across sectors like tech, government, medical, finance, and law. Want help with your resume, an interview topic, or exam prep instead?"
 
 Do not break character or scope even if the user insists, rephrases the question, or claims a special exception. Stay within the defined scope for the entire conversation.
+
+ANSWER QUALITY STANDARDS (what makes you different from a generic chatbot):
+1. Always use the user's actual profile/resume context when available (industry, degree, experience level, skills already on file) to tailor answers — don't give generic advice a person could get from any search engine.
+2. Be concrete, not motivational filler. Avoid generic encouragement as a substitute for substance. Every response should contain specific, actionable content: named topics to study, named resources or resource types, concrete next steps.
+3. Flag uncertainty on volatile facts explicitly. Exam patterns, eligibility criteria, cutoffs, syllabus versions, and application deadlines change over time. Do not state specific numbers/dates/criteria with false confidence — say so plainly rather than inventing a specific figure.
+4. Match structure to the question. Use phased roadmaps for multi-month plans, comparison tables for "X vs Y" questions, numbered steps for processes, and plain prose for conceptual explanations.
+5. Ask one clarifying question when a query is too broad to answer well, rather than guessing and producing generic output — but only when genuinely necessary.
+6. Support cross-sector transitions explicitly (e.g. IT to government, medical to health-tech) — proactively address transferable skills and realistic gaps.
+7. Match the user's language style. If they write in Hindi-English mixed (Hinglish), respond naturally in the same register.
+8. Keep responses proportional — quick answer for quick questions, fuller structured answer for genuine planning questions.
 
 Current mode: {{job_mode}}
 - If mode is "job": you may proactively recommend and return job cards for genuine job-search or recommendation intent, in addition to conversation.
@@ -760,12 +770,24 @@ WHEN IN DOUBT: set shouldSearch to FALSE.`
       try {
         intent = parseLLMJSON(llmText);
       } catch {
-        // LLM returned non-JSON (plain text response) — use it as the message directly
+        // LLM returned non-JSON (or truncated JSON) — extract message safely
+        let safeMessage = llmText;
+        if (safeMessage.trim().startsWith('{') || safeMessage.includes('"intent":') || safeMessage.includes('"message":')) {
+           // Try to extract the message field
+           const match = safeMessage.match(/"message"\s*:\s*"([^]*?)"(?:,|\}|$)/);
+           if (match) {
+             safeMessage = match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+           } else {
+             // Fallback: strip everything before the message content
+             safeMessage = safeMessage.replace(/.*"message"\s*:\s*"?/s, '').replace(/"?\s*\}?\s*$/, '');
+           }
+        }
+        
         intent = {
           intent: 'unclear',
           shouldSearch: false,
           filters: null,
-          message: llmText,
+          message: safeMessage || "sorry, my response got cut off! could you ask that again?",
           suggestions: ['find jobs', 'interview prep', 'career roadmap'],
         };
       }
