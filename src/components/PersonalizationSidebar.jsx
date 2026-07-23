@@ -114,7 +114,7 @@ export default function PersonalizationSidebar({ isOpen, onClose, data, onSave, 
       <div className={`fixed lg:relative z-[80] top-0 left-0 h-full w-[85%] max-w-xs bg-[var(--color-surface)] border-r border-[var(--color-border)] transform transition-all duration-300 flex flex-col shrink-0 overflow-hidden ${panelClasses} ${widthClasses}`}>
         
         {/* Header */}
-        <div className={`flex border-b border-[var(--color-border)] transition-all ${isCollapsed ? 'flex-col items-center p-3 gap-4' : 'items-center justify-between p-4'}`}>
+        <div className={`flex transition-all ${isCollapsed ? 'flex-col items-center p-3 gap-4' : 'items-center justify-between p-4'}`}>
           <div className="flex items-center gap-2 no-underline cursor-default">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
               <img src="/jobsy-logo.png" alt="Jobsy" className="w-full h-full object-contain" />
@@ -126,7 +126,7 @@ export default function PersonalizationSidebar({ isOpen, onClose, data, onSave, 
             className="p-1.5 rounded-md hover:bg-[var(--color-surface-alt)] transition-default cursor-pointer border-0 bg-transparent text-[var(--color-text-secondary)]"
             title={isCollapsed ? "Expand sidebar" : "Close sidebar"}
           >
-            {isCollapsed ? <Menu size={20} /> : <PanelLeftClose size={20} />}
+            <Menu size={24} strokeWidth={1.25} />
           </button>
         </div>
 
